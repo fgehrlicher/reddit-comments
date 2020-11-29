@@ -10,7 +10,7 @@ import (
 )
 
 type Comment struct {
-	Subreddit           string      `json:"subreddit"`
+	sub           string      `json:"sub"`
 	Controversiality    int         `json:"controversiality"`
 	AuthorFlairCSSClass interface{} `json:"author_flair_css_class"`
 	Body                string      `json:"body"`
@@ -20,7 +20,7 @@ type Comment struct {
 	Ups                 int         `json:"ups"`
 	ID                  string      `json:"id"`
 	ParentID            string      `json:"parent_id"`
-	SubredditID         string      `json:"subreddit_id"`
+	subID         string      `json:"sub_id"`
 	RetrievedOn         int         `json:"retrieved_on"`
 	Gilded              int         `json:"gilded"`
 	Distinguished       interface{} `json:"distinguished"`
@@ -40,7 +40,7 @@ func main() {
 	buf := make([]byte, 0, 64*1024)
 	scanner.Buffer(buf, 1024*1024)
 
-	var subredditCommentCount = make(map[string]int)
+	var subCommentCount = make(map[string]int)
 	start := time.Now()
 
 	for scanner.Scan() {
@@ -54,11 +54,11 @@ func main() {
 			continue
 		}
 
-		value, ok := subredditCommentCount[comment.Subreddit]
+		value, ok := subCommentCount[comment.sub]
 		if ok {
-			subredditCommentCount[comment.Subreddit] = value + 1
+			subCommentCount[comment.sub] = value + 1
 		} else {
-			subredditCommentCount[comment.Subreddit] = 1
+			subCommentCount[comment.sub] = 1
 		}
 	}
 
@@ -67,16 +67,16 @@ func main() {
 	}
 
 	fmt.Printf("took %v to parse\n", time.Since(start))
-	fmt.Printf("subreddits: %v\n", len(subredditCommentCount))
+	fmt.Printf("subs: %v\n", len(subCommentCount))
 
-	f, err := os.OpenFile("comments_per_subreddit",
+	f, err := os.OpenFile("comments_per_sub",
 		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Println(err)
 	}
 	defer f.Close()
 
-	for key, value := range subredditCommentCount {
+	for key, value := range subCommentCount {
 		if _, err := f.WriteString(fmt.Sprintf("%v:%v\n", key, value)); err != nil {
 			log.Println(err)
 		}
