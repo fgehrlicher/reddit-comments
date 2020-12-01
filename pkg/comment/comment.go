@@ -1,4 +1,4 @@
-package util
+package comment
 
 type Comment struct {
 	Subreddit           string      `json:"subreddit"`

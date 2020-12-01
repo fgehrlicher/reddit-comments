@@ -1,27 +1,21 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"time"
 
-	"github.com/fgehrlicher/reddit-comments/pkg/util"
+	"github.com/fgehrlicher/reddit-comments/pkg/comment"
+	"github.com/fgehrlicher/reddit-comments/pkg/io"
 )
 
 func main() {
-	file, err := os.Open("RC_2015-11")
+	scanner, err := io.LoadFile("data/RC_2015-11.json")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-
-	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, 1024*1024)
 
 	var subredditCommentCount = make(map[string]int)
 	start := time.Now()
@@ -29,19 +23,19 @@ func main() {
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		var comment util.Comment
-		err := json.Unmarshal([]byte(line), &comment)
+		var com comment.Comment
+		err := json.Unmarshal([]byte(line), &com)
 
 		if err != nil {
 			log.Print(err)
 			continue
 		}
 
-		value, ok := subredditCommentCount[comment.Subreddit]
+		value, ok := subredditCommentCount[com.Subreddit]
 		if ok {
-			subredditCommentCount[comment.Subreddit] = value + 1
+			subredditCommentCount[com.Subreddit] = value + 1
 		} else {
-			subredditCommentCount[comment.Subreddit] = 1
+			subredditCommentCount[com.Subreddit] = 1
 		}
 	}
 
@@ -49,19 +43,25 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("took %v to parse\n", time.Since(start))
-	fmt.Printf("subreddits: %v\n", len(subredditCommentCount))
+	outPath := "out/comments_per_subreddit.csv"
 
-	f, err := os.OpenFile("comments_per_subreddit",
-		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	fmt.Printf("took %v to parse\n", time.Since(start))
+	fmt.Printf("sub count: %v\n", len(subredditCommentCount))
+	fmt.Printf("writing to: %v\n", outPath)
+
+	f, err := os.Create(outPath)
 	if err != nil {
-		log.Println(err)
+		log.Fatal(err)
 	}
 	defer f.Close()
 
+	if _, err := f.WriteString(fmt.Sprintf("%v,%v\n", "subreddit", "comment_count")); err != nil {
+		log.Fatal(err)
+	}
+
 	for key, value := range subredditCommentCount {
-		if _, err := f.WriteString(fmt.Sprintf("%v:%v\n", key, value)); err != nil {
-			log.Println(err)
+		if _, err := f.WriteString(fmt.Sprintf("%v,%v\n", key, value)); err != nil {
+			log.Fatal(err)
 		}
 	}
 }
