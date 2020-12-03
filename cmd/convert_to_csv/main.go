@@ -104,10 +104,6 @@ func prompt() (*promptResult, error) {
 		return nil, err
 	}
 
-	if len(files) == 0 {
-		return nil, fmt.Errorf("no .json files found in '%s'", dataDir)
-	}
-
 	filesSelectionPrompt := &survey.MultiSelect{
 		Message: "files to convert:",
 		Options: files,
@@ -159,5 +155,9 @@ func getAllFiles(base string) ([]string, error) {
 		return nil, err
 	}
 
-	return files, err
+	if len(files) == 0 {
+		return nil, fmt.Errorf("no files found in '%s'", base)
+	}
+
+	return files, nil
 }
