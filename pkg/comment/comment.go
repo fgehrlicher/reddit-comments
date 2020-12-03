@@ -12,7 +12,7 @@ type Comment struct {
 	Controversiality    int         `json:"controversiality"`
 	AuthorFlairCSSClass interface{} `json:"author_flair_css_class"`
 	Body                string      `json:"body"`
-	CreatedUtc          string      `json:"created_utc"`
+	CreatedUtc          interface{} `json:"created_utc"`
 	Author              string      `json:"author"`
 	Score               int         `json:"score"`
 	Ups                 int         `json:"ups"`
@@ -83,7 +83,7 @@ func GetBody(comment *Comment) string {
 }
 
 func GetCreatedUtc(comment *Comment) string {
-	return comment.CreatedUtc
+	return fmt.Sprintf("%v", comment.CreatedUtc)
 }
 
 func GetAuthor(comment *Comment) string {
