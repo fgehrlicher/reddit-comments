@@ -48,9 +48,10 @@ func main() {
 
 			var com comment.Comment
 			err := json.Unmarshal([]byte(line), &com)
-
 			if err != nil {
-				log.Fatal(err)
+				log.Println(fmt.Sprintf("error: %s", err.Error()))
+				log.Println(fmt.Sprintf("full row: %s", line))
+				continue
 			}
 
 			var row []string
