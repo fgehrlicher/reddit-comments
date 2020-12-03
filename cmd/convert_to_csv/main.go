@@ -15,7 +15,6 @@ import (
 )
 
 func main() {
-
 	promptResult, err := prompt()
 	if err != nil {
 		log.Fatal(err)
