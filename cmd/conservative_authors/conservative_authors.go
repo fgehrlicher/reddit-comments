@@ -10,10 +10,14 @@ import (
 	"time"
 )
 
-const conservativeSub = "Conservative"
+const (
+	conservativeSub = "Conservative"
+	inputFile = "out/2015_09-12_data.csv"
+	outputFile = "out/2015_09-12_conservative_authors.csv"
+)
 
 func main() {
-	csvfile, err := os.Open("out/2015_09-12.csv")
+	csvfile, err := os.Open(inputFile)
 	if err != nil {
 		log.Fatalln("Couldn't open the csv file", err)
 	}
@@ -72,9 +76,7 @@ func main() {
 
 	fmt.Printf("took %v to parse\n", time.Since(start))
 
-	path := "out/conservative_authors.csv"
-
-	f, err := os.Create(path)
+	f, err := os.Create(outputFile)
 	if err != nil {
 		log.Println(err)
 	}
@@ -96,5 +98,5 @@ func main() {
 	fmt.Printf("rednecks: %v\n", len(conservativeAuthors))
 	fmt.Printf("comments: %v\n", total)
 	fmt.Printf("comments per redneck: %v\n", total/len(conservativeAuthors))
-	fmt.Printf("writing results to: %v\n", path)
+	fmt.Printf("writing results to: %v\n", outputFile)
 }
