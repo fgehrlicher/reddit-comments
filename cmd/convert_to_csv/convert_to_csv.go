@@ -6,16 +6,15 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/fgehrlicher/reddit-comments/pkg/comment"
 	"github.com/fgehrlicher/reddit-comments/pkg/io"
+	"github.com/fgehrlicher/reddit-comments/pkg/prompt"
 )
 
 func main() {
-	promptResult, err := prompt()
+	promptResult, err := prompt.Prompt()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -71,94 +70,9 @@ func main() {
 
 			resultFileWriter.Flush()
 		}
+
 		elapsed := time.Since(start)
 		fmt.Println(fmt.Sprintf("convert took %s", elapsed))
 		fmt.Println("_________________________")
 	}
-
-}
-
-type promptResult struct {
-	FilesToConvert []string
-	FieldsToCovert []string
-	ResultFilename string
-}
-
-func prompt() (*promptResult, error) {
-	var (
-		dataDir        string
-		filesToConvert []string
-		fieldsToCovert []string
-		resultFilename string
-	)
-
-	dataDirPrompt := &survey.Input{
-		Message: "data dir:",
-	}
-	err := survey.AskOne(dataDirPrompt, &dataDir)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	files, err := getAllFiles(dataDir)
-	if err != nil {
-		return nil, err
-	}
-
-	filesSelectionPrompt := &survey.MultiSelect{
-		Message: "files to convert:",
-		Options: files,
-	}
-	err = survey.AskOne(filesSelectionPrompt, &filesToConvert)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fieldsToCovertPrompt := &survey.MultiSelect{
-		Message: "fields to consider:",
-		Options: comment.GetAllFields(),
-	}
-	err = survey.AskOne(fieldsToCovertPrompt, &fieldsToCovert)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	resultFilenamePrompt := &survey.Input{
-		Message: "result filename:",
-	}
-	err = survey.AskOne(resultFilenamePrompt, &resultFilename)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return &promptResult{
-		FilesToConvert: filesToConvert,
-		ResultFilename: resultFilename,
-		FieldsToCovert: fieldsToCovert,
-	}, nil
-}
-
-func getAllFiles(base string) ([]string, error) {
-	var files []string
-
-	err := filepath.Walk(
-		base,
-		func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-
-			files = append(files, path)
-			return nil
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(files) == 0 {
-		return nil, fmt.Errorf("no files found in '%s'", base)
-	}
-
-	return files, nil
 }
