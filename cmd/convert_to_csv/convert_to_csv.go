@@ -10,11 +10,10 @@ import (
 
 	"github.com/fgehrlicher/reddit-comments/pkg/comment"
 	"github.com/fgehrlicher/reddit-comments/pkg/io"
-	"github.com/fgehrlicher/reddit-comments/pkg/prompt"
 )
 
 func main() {
-	promptResult, err := prompt.Prompt()
+	promptResult, err := ConvertToCsvPrompt()
 	if err != nil {
 		log.Fatal(err)
 	}

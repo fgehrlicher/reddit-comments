@@ -1,4 +1,4 @@
-package prompt
+package main
 
 import (
 	"github.com/AlecAivazis/survey/v2"
@@ -6,13 +6,13 @@ import (
 	"github.com/fgehrlicher/reddit-comments/pkg/io"
 )
 
-type promptResult struct {
+type ConvertToCsvPromtResult struct {
 	FilesToConvert []string
 	FieldsToCovert []string
 	ResultFilename string
 }
 
-func Prompt() (*promptResult, error) {
+func ConvertToCsvPrompt() (*ConvertToCsvPromtResult, error) {
 	var (
 		dataDir        string
 		filesToConvert []string
@@ -59,7 +59,7 @@ func Prompt() (*promptResult, error) {
 		return nil, err
 	}
 
-	return &promptResult{
+	return &ConvertToCsvPromtResult{
 		FilesToConvert: filesToConvert,
 		ResultFilename: resultFilename,
 		FieldsToCovert: fieldsToCovert,
