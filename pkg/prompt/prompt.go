@@ -1,67 +1,106 @@
-package main
+package prompt
 
 import (
+	"fmt"
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/fgehrlicher/reddit-comments/pkg/comment"
 	"github.com/fgehrlicher/reddit-comments/pkg/io"
+	"path"
 )
 
-type ConvertToCsvPromtResult struct {
-	FilesToConvert []string
-	FieldsToCovert []string
-	ResultFilename string
+type Result struct {
+	InputFiles []string
+	OutputFile string
+	Fields     []string
 }
 
-func ConvertToCsvPrompt() (*ConvertToCsvPromtResult, error) {
-	var (
-		dataDir        string
-		filesToConvert []string
-		fieldsToCovert []string
-		resultFilename string
+func Run() (*Result, error) {
+	dataDir, err := dataDir()
+	if err != nil {
+		return nil, fmt.Errorf("data dir prompt: %w", err)
+	}
+
+	inputFiles, err := inputFiles(dataDir)
+	if err != nil {
+		return nil, fmt.Errorf("input files prompt: %w", err)
+	}
+
+	fields, err := fields()
+	if err != nil {
+		return nil, fmt.Errorf("input files prompt: %w", err)
+	}
+
+	outFile, err := outputFile()
+	if err != nil {
+		return nil, fmt.Errorf("output file prompt: %w", err)
+	}
+
+	return &Result{
+		InputFiles: inputFiles,
+		OutputFile: outFile,
+		Fields:     fields,
+	}, nil
+}
+
+func dataDir() (string, error) {
+	var dataDir string
+
+	err := survey.AskOne(
+		&survey.Input{
+			Message: "data dir:",
+		},
+		&dataDir,
 	)
 
-	dataDirPrompt := &survey.Input{
-		Message: "data dir:",
-	}
-	err := survey.AskOne(dataDirPrompt, &dataDir)
+	return dataDir, err
+}
+
+func inputFiles(dataDir string) ([]string, error) {
+	files, err := io.GetAllFilesInDir(dataDir)
 	if err != nil {
 		return nil, err
 	}
 
-	files, err := io.GetAllFiles(dataDir)
-	if err != nil {
-		return nil, err
+	var inputFiles []string
+
+	err = survey.AskOne(
+		&survey.MultiSelect{
+			Message: "input file(s):",
+			Options: files,
+		},
+		&inputFiles,
+	)
+
+	for i := range inputFiles {
+		inputFiles[i] = path.Join(dataDir, inputFiles[i])
 	}
 
-	filesSelectionPrompt := &survey.MultiSelect{
-		Message: "files to convert:",
-		Options: files,
-	}
-	err = survey.AskOne(filesSelectionPrompt, &filesToConvert)
-	if err != nil {
-		return nil, err
-	}
+	return inputFiles, err
+}
 
-	fieldsToCovertPrompt := &survey.MultiSelect{
-		Message: "fields to consider:",
-		Options: comment.GetAllFields(),
-	}
-	err = survey.AskOne(fieldsToCovertPrompt, &fieldsToCovert)
-	if err != nil {
-		return nil, err
-	}
+func fields() ([]string, error) {
+	var fields []string
 
-	resultFilenamePrompt := &survey.Input{
-		Message: "result filename:",
-	}
-	err = survey.AskOne(resultFilenamePrompt, &resultFilename)
-	if err != nil {
-		return nil, err
-	}
+	err := survey.AskOne(
+		&survey.MultiSelect{
+			Message: "fields to consider:",
+			Options: comment.GetAllFields(),
+		},
+		&fields,
+	)
 
-	return &ConvertToCsvPromtResult{
-		FilesToConvert: filesToConvert,
-		ResultFilename: resultFilename,
-		FieldsToCovert: fieldsToCovert,
-	}, nil
+	return fields, err
+}
+
+func outputFile() (string, error) {
+	var outputFile string
+
+	err := survey.AskOne(
+		&survey.Input{
+			Message: "result filename:",
+		},
+		&outputFile,
+	)
+
+	return outputFile, err
 }
