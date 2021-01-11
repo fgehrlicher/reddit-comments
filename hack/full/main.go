@@ -11,17 +11,16 @@ import (
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
-	"github.com/pkg/profile"
 )
 
 func main() {
-	p := profile.Start(profile.TraceProfile, profile.ProfilePath("."), profile.NoShutdownHook)
+	//p := profile.Start(profile.TraceProfile, profile.ProfilePath("."), profile.NoShutdownHook)
 
 	var (
-		fileIn            = "data/test_1mb"
-		fileOut           = "result.csv"
-		chunkSize   int64 = 1024 *10// 1 KiB
-		workerCount       = 10
+		fileIn           = "data/RC_2019-10"
+		fileOut          = "result.csv"
+		chunkSize  int64 = 1024 * 1024 * 100 // 100 MiB
+		maxThreads       = 10
 
 		currentOffset int64 = 0
 		currentChunk        = 1
@@ -54,11 +53,11 @@ func main() {
 	start := time.Now()
 
 	chunkHead := 0
-	resultChan := make(chan ProcessResult, workerCount)
+	resultChan := make(chan ProcessResult, maxThreads)
 	var wg sync.WaitGroup
 
 	wg.Add(len(chunks))
-	for i := 0; i < workerCount; i++ {
+	for i := 0; i < maxThreads; i++ {
 		if chunkHead >= len(chunks) {
 			break
 		}
@@ -111,12 +110,12 @@ func main() {
 	wg.Wait()
 	quit <- 0
 	fmt.Printf("took %v\n", time.Since(start))
-	fmt.Printf("%d chunks failed:\n", len(failedChunks))
+	fmt.Printf("%d chunks failed:", len(failedChunks))
 	for _, failedChunk := range failedChunks {
-		fmt.Printf("%d chunks failed: %s\n", failedChunk.chunk.id, failedChunk.err)
+		fmt.Printf("%d chunks failed: %s", failedChunk.chunk.id, failedChunk.err)
 	}
 
-	p.Stop()
+	//p.Stop()
 }
 
 type Chunk struct {

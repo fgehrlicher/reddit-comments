@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/fgehrlicher/reddit-comments/pkg/comment"
-	"github.com/fgehrlicher/reddit-comments/pkg/io"
+	"github.com/fgehrlicher/reddit-comments/pkg/file"
 	"path"
 )
 
@@ -15,22 +15,22 @@ type Result struct {
 }
 
 func Run() (*Result, error) {
-	dataDir, err := dataDir()
+	dataDir, err := dataDirPrompt()
 	if err != nil {
 		return nil, fmt.Errorf("data dir prompt: %w", err)
 	}
 
-	inputFiles, err := inputFiles(dataDir)
+	inputFiles, err := inputFilesPrompt(dataDir)
 	if err != nil {
 		return nil, fmt.Errorf("input files prompt: %w", err)
 	}
 
-	fields, err := fields()
+	fields, err := fieldsPrompt()
 	if err != nil {
 		return nil, fmt.Errorf("input files prompt: %w", err)
 	}
 
-	outFile, err := outputFile()
+	outFile, err := outputFilePrompt()
 	if err != nil {
 		return nil, fmt.Errorf("output file prompt: %w", err)
 	}
@@ -42,7 +42,7 @@ func Run() (*Result, error) {
 	}, nil
 }
 
-func dataDir() (string, error) {
+func dataDirPrompt() (string, error) {
 	var dataDir string
 
 	err := survey.AskOne(
@@ -55,8 +55,8 @@ func dataDir() (string, error) {
 	return dataDir, err
 }
 
-func inputFiles(dataDir string) ([]string, error) {
-	files, err := io.GetAllFilesInDir(dataDir)
+func inputFilesPrompt(dataDir string) ([]string, error) {
+	files, err := file.GetAllFilesInDir(dataDir)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func inputFiles(dataDir string) ([]string, error) {
 	return inputFiles, err
 }
 
-func fields() ([]string, error) {
+func fieldsPrompt() ([]string, error) {
 	var fields []string
 
 	err := survey.AskOne(
@@ -92,7 +92,7 @@ func fields() ([]string, error) {
 	return fields, err
 }
 
-func outputFile() (string, error) {
+func outputFilePrompt() (string, error) {
 	var outputFile string
 
 	err := survey.AskOne(
