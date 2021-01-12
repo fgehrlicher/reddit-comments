@@ -122,6 +122,7 @@ func (worker *Worker) process(chunk Chunk) {
 
 			csvLine := worker.extractJson(line)
 			copy(worker.csvBuff[csvHead:], csvLine)
+			worker.csvBuff = worker.csvBuff[:csvHead+len(csvLine)]
 
 			break
 		}
