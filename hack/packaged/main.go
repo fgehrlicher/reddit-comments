@@ -7,13 +7,13 @@ import (
 )
 
 func main() {
-	p := profile.Start(profile.TraceProfile, profile.ProfilePath("."), profile.NoShutdownHook)
+	p := profile.Start(profile.CPUProfile, profile.ProfilePath("."), profile.NoShutdownHook)
 
 	var (
-		fileIn            = "data/test_10gb"
+		fileIn            = "data/test_1mb"
 		fileOut           = "result.csv"
-		chunkSize   int64 = 1024 * 10 // 1 KiB
-		workerCount       = 10
+		chunkSize   int64 = 1024 *10 // 100 MiB
+		workerCount       = 6
 	)
 
 	out, err := os.Create(fileOut)
@@ -23,11 +23,7 @@ func main() {
 
 	chunks, err := convert.SplitFileInChunks(chunkSize, fileIn, out)
 
-	queue := convert.Queue{
-		Workers: workerCount,
-		Chunks:  chunks,
-	}
-
+	queue := convert.NewQueue(chunks, workerCount, chunkSize)
 	queue.Work()
 
 	p.Stop()
