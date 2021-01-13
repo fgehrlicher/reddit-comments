@@ -3,6 +3,7 @@ package convert
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -35,8 +36,9 @@ func NewQueue(chunks []Chunk, workers int, chunkSize int64) *Queue {
 func (queue *Queue) Work() {
 	var (
 		waitGroup    sync.WaitGroup
-		start        = time.Now()
-		failedChunks = make([]ProcessResult, 0)
+		start              = time.Now()
+		failedChunks       = make([]ProcessResult, 0)
+		totalLines   int64 = 0
 	)
 
 	waitGroup.Add(queue.workers)
@@ -52,6 +54,7 @@ func (queue *Queue) Work() {
 			select {
 			case result := <-queue.result:
 				chunksProcessed++
+				totalLines += int64(result.processedLines)
 
 				if result.err != nil {
 					fmt.Printf(
@@ -64,12 +67,20 @@ func (queue *Queue) Work() {
 					failedChunks = append(failedChunks, result)
 
 				} else {
+					percent := float32(chunksProcessed) / float32(queue.chunkCount) * 100
+					percentPadding := ""
+					if percent < 10.0 {
+						percentPadding = " "
+					}
+
 					fmt.Printf(
-						"[%*d/%d] done %.2f %%\n",
+						"[%*d/%d] %s%.2f %% done. lines in chunk: %d \n",
 						len(strconv.Itoa(queue.chunkCount)),
 						result.chunk.id,
 						queue.chunkCount,
-						float32(chunksProcessed)/float32(queue.chunkCount)*100,
+						percentPadding,
+						percent,
+						result.processedLines,
 					)
 				}
 
@@ -81,8 +92,15 @@ func (queue *Queue) Work() {
 
 	waitGroup.Wait()
 	quit <- 0
-	fmt.Printf("took %v\n", time.Since(start))
-	fmt.Printf("%d Chunks failed:\n", len(failedChunks))
+
+	fmt.Println(strings.Repeat("-", 10))
+	fmt.Printf(
+		"took %v\nparsed %d lines\n%d Chunks failed:\n",
+		time.Since(start),
+		totalLines,
+		len(failedChunks),
+	)
+
 	for _, failedChunk := range failedChunks {
 		fmt.Printf("chunk %d failed: %s\n", failedChunk.chunk.id, failedChunk.err)
 	}

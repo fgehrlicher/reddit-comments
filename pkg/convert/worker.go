@@ -10,8 +10,9 @@ import (
 )
 
 type ProcessResult struct {
-	chunk Chunk
-	err   error
+	chunk          Chunk
+	processedLines int
+	err            error
 }
 
 type Worker struct {
@@ -92,7 +93,7 @@ func (worker *Worker) process(chunk Chunk) {
 	}
 
 	if partialLastLine {
-		err = worker.fillOverflowBufferUntilLinebreak()
+		err = worker.fillOverflowBuffer()
 		if err != nil {
 			worker.handleErr(result, err)
 			return
@@ -100,7 +101,7 @@ func (worker *Worker) process(chunk Chunk) {
 	}
 
 	var (
-		line []byte
+		line    []byte
 		csvHead int
 	)
 
@@ -109,8 +110,10 @@ func (worker *Worker) process(chunk Chunk) {
 		lastLine := relativeIndex == -1
 
 		if lastLine && !partialLastLine {
+			chunkTest := worker.buff[buffHead-10:]
 			err = errors.New("no linebreak but isn't a partial last line")
 			worker.handleErr(result, err)
+			_ = chunkTest
 			return
 		}
 
@@ -123,6 +126,7 @@ func (worker *Worker) process(chunk Chunk) {
 			csvLine := worker.extractJson(line)
 			copy(worker.csvBuff[csvHead:], csvLine)
 			worker.csvBuff = worker.csvBuff[:csvHead+len(csvLine)]
+			result.processedLines++
 
 			break
 		}
@@ -133,6 +137,11 @@ func (worker *Worker) process(chunk Chunk) {
 		csvHead += len(csvLine)
 		buffHead += relativeIndex + 1
 		line = line[:0]
+		result.processedLines++
+
+		if buffHead == realChunkSize {
+			break
+		}
 	}
 
 	_, err = chunk.out.Write(worker.csvBuff)
@@ -159,7 +168,7 @@ func (worker *Worker) extractJson(data []byte) []byte {
 		subreddit = worker.extractField(data, []byte("\"subreddit\":\""), []byte("\",\""))
 	)
 
-	return []byte(string(author)+","+string(subreddit)+"\n")
+	return []byte(string(author) + "," + string(subreddit) + "\n")
 }
 
 func (worker *Worker) extractField(data, fieldSelector, fieldSelectorEnd []byte) []byte {
@@ -169,7 +178,7 @@ func (worker *Worker) extractField(data, fieldSelector, fieldSelectorEnd []byte)
 	return data[fieldStart:fieldEnd]
 }
 
-func (worker *Worker) fillOverflowBufferUntilLinebreak() error {
+func (worker *Worker) fillOverflowBuffer() error {
 	var (
 		buffHead = 0
 		scans    = 0
@@ -211,6 +220,7 @@ func (worker *Worker) handleErr(result ProcessResult, err error) {
 }
 
 func (worker *Worker) resetBuffers() {
-	worker.buff = worker.buff[:0]
-	worker.overflowBuff = worker.overflowBuff[:0]
+	worker.buff = make([]byte, worker.chunkSize)
+	worker.overflowBuff = make([]byte, worker.overflowIncrement)
+	worker.csvBuff = make([]byte, worker.chunkSize)
 }

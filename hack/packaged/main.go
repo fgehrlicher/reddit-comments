@@ -10,9 +10,9 @@ func main() {
 	p := profile.Start(profile.CPUProfile, profile.ProfilePath("."), profile.NoShutdownHook)
 
 	var (
-		fileIn            = "data/test_1mb"
+		fileIn            = "data/RC_2019-10"
 		fileOut           = "result.csv"
-		chunkSize   int64 = 1024 *10 // 100 MiB
+		chunkSize   int64 = 1024 * 1024 * 100 // 100 MiB
 		workerCount       = 6
 	)
 
