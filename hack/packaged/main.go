@@ -13,7 +13,7 @@ func main() {
 		fileIn            = "data/RC_2019-10"
 		fileOut           = "result.csv"
 		chunkSize   int64 = 1024 * 1024 * 100 // 100 MiB
-		workerCount       = 6
+		workerCount       = 10
 	)
 
 	out, err := os.Create(fileOut)

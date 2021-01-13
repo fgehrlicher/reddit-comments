@@ -14,7 +14,7 @@ type Queue struct {
 	chunkSize  int64
 
 	tasks  chan Chunk
-	result chan ProcessResult
+	result chan ChunkResult
 }
 
 func NewQueue(chunks []Chunk, workers int, chunkSize int64) *Queue {
@@ -27,7 +27,7 @@ func NewQueue(chunks []Chunk, workers int, chunkSize int64) *Queue {
 	return &Queue{
 		workers:    workers,
 		tasks:      tasks,
-		result:     make(chan ProcessResult, workers),
+		result:     make(chan ChunkResult, workers),
 		chunkCount: len(chunks),
 		chunkSize:  chunkSize,
 	}
@@ -37,7 +37,7 @@ func (queue *Queue) Work() {
 	var (
 		waitGroup    sync.WaitGroup
 		start              = time.Now()
-		failedChunks       = make([]ProcessResult, 0)
+		failedChunks       = make([]ChunkResult, 0)
 		totalLines   int64 = 0
 	)
 
@@ -54,7 +54,7 @@ func (queue *Queue) Work() {
 			select {
 			case result := <-queue.result:
 				chunksProcessed++
-				totalLines += int64(result.processedLines)
+				totalLines += int64(result.chunk.processedLines)
 
 				if result.err != nil {
 					fmt.Printf(
@@ -70,6 +70,9 @@ func (queue *Queue) Work() {
 					percent := float32(chunksProcessed) / float32(queue.chunkCount) * 100
 					percentPadding := ""
 					if percent < 10.0 {
+						percentPadding = "  "
+					}
+					if percent > 10 && percent != 100{
 						percentPadding = " "
 					}
 
@@ -80,7 +83,7 @@ func (queue *Queue) Work() {
 						queue.chunkCount,
 						percentPadding,
 						percent,
-						result.processedLines,
+						result.chunk.processedLines,
 					)
 				}
 

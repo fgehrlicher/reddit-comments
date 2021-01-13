@@ -12,6 +12,18 @@ type Chunk struct {
 	size   int64
 
 	out io.Writer
+
+	// Used during processing
+	realSize         int
+	partialFirstLine bool
+	partialLastLine  bool
+	buffHead         int
+	processedLines   int
+}
+
+type ChunkResult struct {
+	chunk Chunk
+	err error
 }
 
 func SplitFileInChunks(chunkSize int64, fileIn string, fileOut io.Writer) ([]Chunk, error) {
