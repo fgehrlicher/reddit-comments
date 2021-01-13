@@ -22,10 +22,11 @@ type Worker struct {
 
 	handle       *os.File
 	chunk        *Chunk
-	buffHead     int
 	buff         []byte
 	overflowBuff []byte
 	csvBuff      []byte
+	buffHead     int
+	csvBuffHead  int
 }
 
 // NewWorker returns a new Worker whose buffer has the default size.
@@ -35,10 +36,11 @@ func NewWorker(tasks chan Chunk, result chan ChunkResult, chunkSize int64, waitG
 		resultChan:   result,
 		waitGroup:    waitGroup,
 		chunkSize:    chunkSize,
-		buffHead:     0,
 		buff:         make([]byte, chunkSize),
 		overflowBuff: make([]byte, overflowIncrement),
 		csvBuff:      make([]byte, chunkSize),
+		buffHead:     0,
+		csvBuffHead:  0,
 	}
 }
 
@@ -53,7 +55,7 @@ func (worker *Worker) Work() {
 		err = worker.Process()
 		worker.resultChan <- ChunkResult{
 			chunk: *worker.chunk,
-			err: err,
+			err:   err,
 		}
 	}
 }
@@ -130,38 +132,34 @@ func (worker *Worker) prepareFileHandles() (err error) {
 
 // wipe all buffers but keep space allocated
 func (worker *Worker) resetBuffers() {
-	worker.buff = make([]byte, worker.chunkSize)
-	worker.overflowBuff = make([]byte, overflowIncrement)
-	worker.csvBuff = make([]byte, worker.chunkSize)
+	worker.buff = worker.buff[:cap(worker.buff)]
+	worker.overflowBuff = worker.overflowBuff[:cap(worker.overflowBuff)]
+	worker.csvBuff = worker.csvBuff[:cap(worker.csvBuff)]
 	worker.buffHead = 0
 }
 
 func (worker *Worker) readChunkInBuff() (err error) {
 	worker.chunk.realSize, err = worker.handle.Read(worker.buff)
-	if err != nil {
-		return err
-	}
-
 	return
 }
 
 func (worker *Worker) readOverflowInBuff() error {
 	var (
-		buffHead = 0
-		scans    = 0
-		scanMax  = cap(worker.overflowBuff)
+		buffHead        = 0
+		scans           = 0
+		initialBuffSize = cap(worker.overflowBuff)
 	)
 
 	for {
 		scans++
 
-		if scanMax > cap(worker.overflowBuff) {
-			newBuff := make([]byte, scanMax)
+		if initialBuffSize > cap(worker.overflowBuff) {
+			newBuff := make([]byte, initialBuffSize)
 			copy(newBuff, worker.overflowBuff)
 			worker.overflowBuff = newBuff
 		}
 
-		scanBuff := worker.overflowBuff[buffHead:scanMax]
+		scanBuff := worker.overflowBuff[buffHead:initialBuffSize]
 
 		_, err := worker.handle.Read(scanBuff)
 		if err != nil {
@@ -174,8 +172,8 @@ func (worker *Worker) readOverflowInBuff() error {
 			break
 		}
 
-		buffHead = scanMax
-		scanMax += overflowIncrement
+		buffHead = initialBuffSize
+		initialBuffSize += overflowIncrement
 	}
 
 	return nil
