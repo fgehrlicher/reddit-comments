@@ -11,9 +11,7 @@ import (
 // Chosen by fair dice roll.
 const overflowIncrement = 1024
 
-//
-// All buffs and handles are kept allocated but wiped clean
-// after each iteration of Worker.Process.
+// All buffs and handles are kept allocated for all iterations of Worker.Process.
 type Worker struct {
 	TasksChan  chan Chunk
 	resultChan chan ChunkResult
@@ -44,7 +42,7 @@ func NewWorker(tasks chan Chunk, result chan ChunkResult, chunkSize int64, waitG
 	}
 }
 
-// processes chunks from Worker.TasksChan until queue is empty
+// Work processes chunks from Worker.TasksChan until queue is empty
 func (worker *Worker) Work() {
 	defer worker.waitGroup.Done()
 	var err error
@@ -121,6 +119,8 @@ func (worker *Worker) prepareBuff() error {
 	return nil
 }
 
+// prepareFileHandles creates the main read handle and sets
+// the read offset.
 func (worker *Worker) prepareFileHandles() (err error) {
 	if worker.handle == nil || worker.handle.Name() != worker.chunk.file {
 		worker.handle, err = os.Open(worker.chunk.file)
@@ -130,14 +130,17 @@ func (worker *Worker) prepareFileHandles() (err error) {
 	return
 }
 
-// wipe all buffers but keep space allocated
+// resetBuffers extend the size of all buffers to their cap and
+// resets all buffer heads.
 func (worker *Worker) resetBuffers() {
 	worker.buff = worker.buff[:cap(worker.buff)]
 	worker.overflowBuff = worker.overflowBuff[:cap(worker.overflowBuff)]
 	worker.csvBuff = worker.csvBuff[:cap(worker.csvBuff)]
 	worker.buffHead = 0
+	worker.csvBuffHead = 0
 }
 
+// readChunkInBuff the
 func (worker *Worker) readChunkInBuff() (err error) {
 	worker.chunk.realSize, err = worker.handle.Read(worker.buff)
 	return
@@ -180,10 +183,7 @@ func (worker *Worker) readOverflowInBuff() error {
 }
 
 func (worker *Worker) convertBuffToCsv() error {
-	var (
-		line    []byte
-		csvHead = 0
-	)
+	var line []byte
 
 	for {
 		relativeIndex := bytes.IndexByte(worker.buff[worker.buffHead:], '\n')
@@ -200,17 +200,17 @@ func (worker *Worker) convertBuffToCsv() error {
 			copy(line[len(remainingBuff):], worker.overflowBuff)
 
 			csvLine := worker.extractJson(line)
-			copy(worker.csvBuff[csvHead:], csvLine)
-			worker.csvBuff = worker.csvBuff[:csvHead+len(csvLine)]
+			copy(worker.csvBuff[worker.csvBuffHead:], csvLine)
+			worker.csvBuff = worker.csvBuff[:worker.csvBuffHead+len(csvLine)]
 			worker.chunk.processedLines++
 
 			break
 		}
 
 		csvLine := worker.extractJson(worker.buff[worker.buffHead : worker.buffHead+relativeIndex])
-		copy(worker.csvBuff[csvHead:], csvLine)
+		copy(worker.csvBuff[worker.csvBuffHead:], csvLine)
 
-		csvHead += len(csvLine)
+		worker.csvBuffHead += len(csvLine)
 		worker.buffHead += relativeIndex + 1
 		line = line[:0]
 		worker.chunk.processedLines++
