@@ -52,8 +52,8 @@ func (worker *Worker) Work() {
 
 		err = worker.Process()
 		worker.resultChan <- ChunkResult{
-			chunk: *worker.chunk,
-			err:   err,
+			Chunk: *worker.chunk,
+			Err:   err,
 		}
 	}
 }
@@ -98,7 +98,7 @@ func (worker *Worker) Process() error {
 
 func (worker *Worker) prepareBuff() error {
 	worker.chunk.partialFirstLine = worker.buff[0] != '{'
-	worker.chunk.partialLastLine = worker.buff[worker.chunk.realSize-1] != '\n'
+	worker.chunk.partialLastLine = worker.buff[len(worker.buff)-1] != '\n'
 
 	if worker.chunk.partialFirstLine {
 		i := bytes.IndexByte(worker.buff, '\n')
@@ -107,6 +107,7 @@ func (worker *Worker) prepareBuff() error {
 		}
 
 		worker.buffHead += i + 1
+		worker.chunk.RealOffset = worker.chunk.Offset + int64(i)
 	}
 
 	if worker.chunk.partialLastLine {
@@ -114,6 +115,8 @@ func (worker *Worker) prepareBuff() error {
 		if err != nil {
 			return err
 		}
+
+		worker.chunk.RealSize += len(worker.overflowBuff)
 	}
 
 	return nil
@@ -122,11 +125,11 @@ func (worker *Worker) prepareBuff() error {
 // prepareFileHandles creates the main read handle and sets
 // the read offset.
 func (worker *Worker) prepareFileHandles() (err error) {
-	if worker.handle == nil || worker.handle.Name() != worker.chunk.file {
-		worker.handle, err = os.Open(worker.chunk.file)
+	if worker.handle == nil || worker.handle.Name() != worker.chunk.File {
+		worker.handle, err = os.Open(worker.chunk.File)
 	}
 
-	_, err = worker.handle.Seek(worker.chunk.offset, io.SeekStart)
+	_, err = worker.handle.Seek(worker.chunk.Offset, io.SeekStart)
 	return
 }
 
@@ -142,7 +145,8 @@ func (worker *Worker) resetBuffers() {
 
 // readChunkInBuff reads up to len(worker.buff) bytes from the file.
 func (worker *Worker) readChunkInBuff() (err error) {
-	worker.chunk.realSize, err = worker.handle.Read(worker.buff)
+	worker.chunk.RealSize, err = worker.handle.Read(worker.buff)
+	worker.buff = worker.buff[:worker.chunk.RealSize]
 	return
 }
 
@@ -178,40 +182,46 @@ func (worker *Worker) readOverflowInBuff() error {
 	return nil
 }
 
+// convertBuffToCsv converts all the json content in Worker.buff and
+// Worker.overflowBuff to csv and safes it into Worker.csvBuff
 func (worker *Worker) convertBuffToCsv() error {
-	var line []byte
+	var (
+		line            []byte
+		noLinebreakLeft bool
+		relativeIndex   int
+	)
 
 	for {
-		relativeIndex := bytes.IndexByte(worker.buff[worker.buffHead:], '\n')
-		incompleteLine := relativeIndex == -1
+		relativeIndex = bytes.IndexByte(worker.buff[worker.buffHead:], '\n')
+		noLinebreakLeft = relativeIndex == -1
 
-		if incompleteLine && !worker.chunk.partialLastLine {
-			return ErrNotPartialLastLineButIncompleteLine
-		}
+		if noLinebreakLeft {
+			if !worker.chunk.partialLastLine {
+				return ErrNotPartialLastLineButIncompleteLine
+			}
 
-		if incompleteLine {
 			remainingBuff := worker.buff[worker.buffHead:]
 			line = make([]byte, len(remainingBuff)+len(worker.overflowBuff))
 			copy(line[:len(remainingBuff)], remainingBuff)
 			copy(line[len(remainingBuff):], worker.overflowBuff)
 
-			csvLine := worker.extractJson(line)
+			csvLine := worker.lineToCSV(line)
 			copy(worker.csvBuff[worker.csvBuffHead:], csvLine)
 			worker.csvBuff = worker.csvBuff[:worker.csvBuffHead+len(csvLine)]
-			worker.chunk.processedLines++
+			worker.chunk.LinesProcessed++
 
 			break
 		}
 
-		csvLine := worker.extractJson(worker.buff[worker.buffHead : worker.buffHead+relativeIndex])
+		csvLine := worker.lineToCSV(worker.buff[worker.buffHead : worker.buffHead+relativeIndex])
 		copy(worker.csvBuff[worker.csvBuffHead:], csvLine)
 
 		worker.csvBuffHead += len(csvLine)
 		worker.buffHead += relativeIndex + 1
 		line = line[:0]
-		worker.chunk.processedLines++
+		worker.chunk.LinesProcessed++
 
-		if worker.buffHead == worker.chunk.realSize {
+		if worker.buffHead == worker.chunk.RealSize {
 			break
 		}
 	}
@@ -219,10 +229,16 @@ func (worker *Worker) convertBuffToCsv() error {
 	return nil
 }
 
-func (worker *Worker) extractJson(data []byte) []byte {
+var (
+	authorSelector    = []byte("\"author\":\"")
+	subredditSelector = []byte("\"subreddit\":\"")
+)
+
+func (worker *Worker) lineToCSV(data []byte) []byte {
 	var (
-		author    = worker.extractField(data, []byte("\"author\":\""), []byte("\",\""))
-		subreddit = worker.extractField(data, []byte("\"subreddit\":\""), []byte("\",\""))
+		author    = worker.extractField(data, authorSelector, []byte("\",\""))
+		subreddit = worker.extractField(data, subredditSelector, []byte("\",\""),
+		)
 	)
 
 	return []byte(string(author) + "," + string(subreddit) + "\n")

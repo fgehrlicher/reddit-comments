@@ -6,24 +6,22 @@ import (
 )
 
 type Chunk struct {
-	id     int
-	file   string
-	offset int64
-	size   int64
+	Id             int
+	File           string
+	Offset         int64
+	Size           int64
+	RealOffset     int64
+	RealSize       int
+	LinesProcessed int
 
-	out io.Writer
-
-	// Used during processing
-	realSize         int
+	out              io.Writer
 	partialFirstLine bool
 	partialLastLine  bool
-	buffHead         int
-	processedLines   int
 }
 
 type ChunkResult struct {
-	chunk Chunk
-	err error
+	Chunk Chunk
+	Err   error
 }
 
 func SplitFileInChunks(chunkSize int64, fileIn string, fileOut io.Writer) ([]Chunk, error) {
@@ -40,11 +38,12 @@ func SplitFileInChunks(chunkSize int64, fileIn string, fileOut io.Writer) ([]Chu
 
 	for currentOffset <= info.Size() {
 		chunks = append(chunks, Chunk{
-			id:     currentChunk,
-			offset: currentOffset,
-			size:   chunkSize,
-			file:   fileIn,
-			out:    fileOut,
+			Id:         currentChunk,
+			Offset:     currentOffset,
+			RealOffset: currentOffset,
+			Size:       chunkSize,
+			File:       fileIn,
+			out:        fileOut,
 		})
 
 		currentOffset += chunkSize

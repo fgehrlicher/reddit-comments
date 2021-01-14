@@ -1,9 +1,13 @@
 package main
 
 import (
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/fgehrlicher/reddit-comments/pkg/convert"
 	"github.com/pkg/profile"
-	"os"
 )
 
 func main() {
@@ -21,10 +25,31 @@ func main() {
 		panic(err)
 	}
 
-	chunks, err := convert.SplitFileInChunks(chunkSize, fileIn, out)
+	start := time.Now()
 
+	chunks, err := convert.SplitFileInChunks(chunkSize, fileIn, out)
 	queue := convert.NewQueue(chunks, workerCount, chunkSize)
-	queue.Work()
+	results := queue.Work()
+
+	var (
+		totalLines   int64
+		failedChunks int
+	)
+
+	for _, result := range results {
+		totalLines += int64(result.Chunk.LinesProcessed)
+		if result.Err != nil {
+			failedChunks++
+		}
+	}
+
+	fmt.Println(strings.Repeat("-", 20))
+	fmt.Printf(
+		"took %v\nparsed %d lines\n%d chunks faile:\n",
+		time.Since(start),
+		totalLines,
+		failedChunks,
+	)
 
 	p.Stop()
 }

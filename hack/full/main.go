@@ -17,9 +17,9 @@ func main() {
 	//p := profile.Start(profile.TraceProfile, profile.ProfilePath("."), profile.NoShutdownHook)
 
 	var (
-		fileIn           = "data/RC_2019-10"
+		fileIn           = "data/test_1gb"
 		fileOut          = "result.csv"
-		chunkSize  int64 = 1024 * 1024 * 100 // 100 MiB
+		chunkSize  int64 = 1024 * 10 // 100 MiB
 		maxThreads       = 10
 
 		currentOffset int64 = 0
