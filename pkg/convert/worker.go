@@ -9,7 +9,7 @@ import (
 )
 
 // Chosen by fair dice roll.
-const overflowIncrement = 1024
+const overflowScanSize = 1024
 
 // All buffs and handles are kept allocated for all iterations of Worker.Process.
 type Worker struct {
@@ -35,7 +35,7 @@ func NewWorker(tasks chan Chunk, result chan ChunkResult, chunkSize int64, waitG
 		waitGroup:    waitGroup,
 		chunkSize:    chunkSize,
 		buff:         make([]byte, chunkSize),
-		overflowBuff: make([]byte, overflowIncrement),
+		overflowBuff: make([]byte, overflowScanSize),
 		csvBuff:      make([]byte, chunkSize),
 		buffHead:     0,
 		csvBuffHead:  0,
@@ -59,8 +59,8 @@ func (worker *Worker) Work() {
 }
 
 var (
-	ErrNotPartialLastLineNoLinebreak = errors.New("no linebreak but isn't a partial last line")
-	ErrPartialFirstLineNoLinebreak   = errors.New("no linebreak found in buff but partial first line")
+	ErrNotPartialLastLineButIncompleteLine = errors.New("no linebreak but isn't a partial last line")
+	ErrPartialOnlyOneIncompleteLine        = errors.New("no linebreak found in buff but partial first line")
 )
 
 func (worker *Worker) Process() error {
@@ -103,7 +103,7 @@ func (worker *Worker) prepareBuff() error {
 	if worker.chunk.partialFirstLine {
 		i := bytes.IndexByte(worker.buff, '\n')
 		if i == -1 {
-			return ErrPartialFirstLineNoLinebreak
+			return ErrPartialOnlyOneIncompleteLine
 		}
 
 		worker.buffHead += i + 1
@@ -140,32 +140,24 @@ func (worker *Worker) resetBuffers() {
 	worker.csvBuffHead = 0
 }
 
-// readChunkInBuff the
+// readChunkInBuff reads up to len(worker.buff) bytes from the file.
 func (worker *Worker) readChunkInBuff() (err error) {
 	worker.chunk.realSize, err = worker.handle.Read(worker.buff)
 	return
 }
 
+// readOverflowInBuff reads overflowScanSize chunks until the next
+// linebreak has been found.
 func (worker *Worker) readOverflowInBuff() error {
 	var (
-		buffHead        = 0
-		scans           = 0
-		initialBuffSize = cap(worker.overflowBuff)
+		buffHead = 0
+		buffSize = len(worker.overflowBuff)
 	)
 
 	for {
-		scans++
+		scanBuff := worker.overflowBuff[buffHead:buffSize]
 
-		if initialBuffSize > cap(worker.overflowBuff) {
-			newBuff := make([]byte, initialBuffSize)
-			copy(newBuff, worker.overflowBuff)
-			worker.overflowBuff = newBuff
-		}
-
-		scanBuff := worker.overflowBuff[buffHead:initialBuffSize]
-
-		_, err := worker.handle.Read(scanBuff)
-		if err != nil {
+		if _, err := worker.handle.Read(scanBuff); err != nil {
 			return err
 		}
 
@@ -175,8 +167,12 @@ func (worker *Worker) readOverflowInBuff() error {
 			break
 		}
 
-		buffHead = initialBuffSize
-		initialBuffSize += overflowIncrement
+		buffHead = buffSize
+		buffSize += overflowScanSize
+		newBuff := make([]byte, buffSize)
+
+		copy(newBuff, worker.overflowBuff)
+		worker.overflowBuff = newBuff
 	}
 
 	return nil
@@ -187,13 +183,13 @@ func (worker *Worker) convertBuffToCsv() error {
 
 	for {
 		relativeIndex := bytes.IndexByte(worker.buff[worker.buffHead:], '\n')
-		lastLine := relativeIndex == -1
+		incompleteLine := relativeIndex == -1
 
-		if lastLine && !worker.chunk.partialLastLine {
-			return ErrNotPartialLastLineNoLinebreak
+		if incompleteLine && !worker.chunk.partialLastLine {
+			return ErrNotPartialLastLineButIncompleteLine
 		}
 
-		if lastLine {
+		if incompleteLine {
 			remainingBuff := worker.buff[worker.buffHead:]
 			line = make([]byte, len(remainingBuff)+len(worker.overflowBuff))
 			copy(line[:len(remainingBuff)], remainingBuff)
