@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"log"
 	"os"
 	"sync"
+
+	"github.com/valyala/fastjson"
 )
 
 // Chosen by fair dice roll.
@@ -229,26 +232,16 @@ func (worker *Worker) convertBuffToCsv() error {
 	return nil
 }
 
-var (
-	authorSelector    = []byte("\"author\":\"")
-	subredditSelector = []byte("\"subreddit\":\"")
-)
+func (worker *Worker) lineToCSV(line []byte) []byte {
+	var p fastjson.Parser
+	v, err := p.Parse(string(line))
+	if err != nil {
+		log.Fatal(err)
+	}
 
-func (worker *Worker) lineToCSV(data []byte) []byte {
-	var (
-		author    = worker.extractField(data, authorSelector, []byte("\",\""))
-		subreddit = worker.extractField(data, subredditSelector, []byte("\",\""),
-		)
-	)
+	_ = v
 
-	return []byte(string(author) + "," + string(subreddit) + "\n")
-}
-
-func (worker *Worker) extractField(data, fieldSelector, fieldSelectorEnd []byte) []byte {
-	fieldStart := bytes.Index(data, fieldSelector) + len(fieldSelector)
-	fieldEnd := bytes.Index(data[fieldStart:], fieldSelectorEnd) + fieldStart
-
-	return data[fieldStart:fieldEnd]
+	return []byte("," + "\n")
 }
 
 func (worker *Worker) writeCsvBuff() (err error) {
